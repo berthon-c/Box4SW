@@ -1,0 +1,10 @@
+riemann                         :::  Nom du cas
+.F.                      	:::  DATA%Restart 
+  3         1       0      	:::  Data%Impre, Data%Icas, Data%Itopo
+  0         1       0           :::  Data%Isource_topo, Data%Isource_friction, Data%Isource_pluie   
+  2                     	:::  Data%Ndim                                 
+ 1    200    10                 :::  Data%Iflux, Data%Ifre, Data%Ifres 
+0.5E+00                    	:::  Data%CFlMax                           
+ 1.5E-1     20000           	:::  Data%Tmax, Data%Ktmax   
+
+

@@ -1,0 +1,519 @@
+MODULE IO_Init
+
+!!$ Module gerant les entrees/sorties et l'initialisation
+
+  !---------------------------------------------------------------!
+  !!$ Auteurs : B. Nkonga , C. Berthon, R. Turpault, C. Sarazin
+  !---------------------------------------------------------------!
+
+  ! listes des subroutines :
+  ! - Tube_a_chocs_1D_En_x
+  ! - InitRiemann
+  ! - Solution_Constante
+  ! - DonNumMeth
+  ! - DonClimites
+  ! - Reprise_in
+  ! - Reprise_out
+  ! - CellVertexVtk
+
+
+  USE var_types
+
+  IMPLICIT NONE
+
+CONTAINS
+
+
+  !******************************************************!
+  !*    Tube A Choc 1D                                  *!
+  !******************************************************!
+  SUBROUTINE Tube_a_chocs_1D_En_x(DATA, Mesh, Var)
+
+    TYPE(Donnees),     INTENT(in)       :: DATA
+    TYPE(MeshDef) ,    INTENT(inout)    :: Mesh
+    TYPE(Variables),   INTENT(inout)    :: Var
+
+    INTEGER            :: is
+    REAL(PR)           :: r
+    REAL(PR)           :: Xmin, Xmax, Xmil
+    REAL(PR)           :: EL, FxL, FyL, TL
+    REAL(PR)           :: ER, FxR, FyR, TR
+
+
+    IF (Data%impre > 5 ) WRITE(6,*) ' ..... Initialisation  &
+         &    Tube a chocs 1D Suivant x .... '
+
+    CALL InitRiemann(EL,FxL,FyL,TL,ER,FxR,FyR,TR,data%Icas)
+
+!   Ns = Var%NCells
+
+!   Var%UA(1,:) = EL
+!   Var%UA(2,:) = FxL
+!   Var%UA(3,:) = FyL
+!   Var%UA(4,:) = TL
+    DO is = 1, Var%NCells
+       Var%UA(1,is) = EL
+       Var%UA(2,is) = FxL
+       Var%UA(3,is) = FyL
+       Var%UA(4,is) = TL
+    END DO
+
+!   Xmax = Maxval(Mesh%coor(1,:))
+!   Xmin = Minval(Mesh%coor(1,:))
+    Xmax = 0.0_PR
+    Xmin = 0.0_PR
+    DO is = 1, Var%Ncells
+       Xmax = Max(Xmax, Mesh%coor(1,is) )
+       Xmin = Min(Xmin, Mesh%coor(1,is) )
+    END DO
+    Xmil = 0.5_PR*(Xmin + Xmax)
+
+    DO is = 1, Var%NCells
+       r = Mesh%coor(1,is)
+     
+       IF( r > Xmil ) THEN
+          Var%UA(1,is) = ER
+          Var%UA(2,is) = FxR
+          Var%UA(3,is) = FyR
+          Var%UA(4,is) = TR
+       END IF
+    END DO
+
+    IF (Data%impre > 5 ) WRITE(6,*) ' UA  min =  ' , MINVAL( Var%UA, DIM=2 )
+    IF (Data%impre > 5 ) WRITE(6,*) ' UA  max =  ' , MAXVAL( Var%UA, DIM=2 )
+    IF (Data%impre > 5 ) WRITE(6,*) ' ..... Fin de l''initialisation .... '
+
+
+  END SUBROUTINE Tube_a_chocs_1D_En_x
+  !************************************************************************!
+
+
+  !************************************************************************!
+  SUBROUTINE InitRiemann(EL,FxL,FyL,TL,ER,FxR,FyR,TR,Icas)
+
+    INTEGER, INTENT(in)     :: Icas
+    REAL(PR), INTENT(out)   :: EL,FxL,FyL,TL,ER,FxR,FyR,TR
+
+    SELECT CASE(Icas)
+    CASE(1)
+       EL  = 10.0_PR
+       FxL = 0.0_PR
+       FyL = 0.0_PR
+       TL  = 1.0_PR
+       
+       ER  = 0.125_PR
+       FxR = 0.0_PR
+       FyR = 0.0_PR
+       TR  = 10.0_PR
+
+    CASE default
+       WRITE(6,*) 'Initialisation de Riemann non codee'
+       STOP
+
+    END SELECT
+
+  END SUBROUTINE InitRiemann
+  !**************************************************************************!
+
+
+  !**************************************************************************!
+  SUBROUTINE Solution_Constante(DATA,Var)
+    
+    TYPE(Donnees),     INTENT(in)     :: DATA
+    TYPE(Variables),   INTENT(inout)  :: Var
+   
+    REAL(PR)   :: scal1, scal2, scal3, scal4 
+    INTEGER    :: is
+        
+    IF (Data%impre > 5 ) WRITE(6,*) ' ..... debut de l''initialisation   &
+         &   par un etat constant.... '
+
+!   Var%UA(1,:) = a_energie * DATA%TRIn**4  
+!   Var%UA(2,:) = Var%UA(1,:) * c_lum * DATA%fa_xIn
+!   Var%UA(3,:) = Var%UA(1,:) * c_lum * DATA%fa_yIn
+!   Var%UA(4,:) = DATA%TIn
+
+    scal1 = ( a_energie * DATA%TRIn**4 )
+    scal2 = ( a_energie * DATA%TRIn**4 ) * c_lum * DATA%fa_xIn
+    scal3 = ( a_energie * DATA%TRIn**4 ) * c_lum * DATA%fa_yIn
+    scal4 = DATA%TIn
+    DO is = 1, Var%Ncells
+       Var%UA(1,is) = scal1
+       Var%UA(2,is) = scal2
+       Var%UA(3,is) = scal3
+       Var%UA(4,is) = scal4
+    END DO
+
+   
+  END SUBROUTINE Solution_Constante
+ !**************************************************************************!
+
+
+  !**************************************************************************!
+  SUBROUTINE DonNumMeth(DATA)
+   
+    TYPE(Donnees),     INTENT(inout)     :: DATA
+    
+    OPEN(66,file='NumMeth.data',FORM="formatted", STATUS="old" )
+
+    READ(66,*) DATA%RootName
+    READ(66,*) Data%Reprise
+    READ(66,*) Data%Impre  , Data%Icas
+    READ(66,*) Data%Ndim   
+    READ(66,*) Data%Iflux  , Data%Ifre  ,  Data%Ifres
+    READ(66,*) Data%CFl 
+    READ(66,*) Data%Tmax   , Data%Ktmax  
+    READ(66,*) Data%TRIn, Data%fa_xIn, Data%fa_yIn , Data%TIn
+
+    CLOSE(66)
+
+    Data%Nvar   = Data%Ndim+2
+    Data%Nsmplx = Data%Ndim
+    DATA%kt     = 0
+    DATA%T      = 0.0_PR
+  
+  END SUBROUTINE DonNumMeth
+!***************************************************************************!
+
+
+!***************************************************************************!
+  SUBROUTINE DonClimites(DATA, Mesh)
+    
+    TYPE(Donnees),     INTENT(inout)     :: DATA
+    TYPE(MeshDef),     INTENT(inout)     :: Mesh
+
+    LOGICAL :: Found
+    INTEGER :: ibord, MaxLogfac, Facmax, ilog, ifac
+    REAL(PR)    :: E, fa_x, fa_y, Temp_rad, Temp_mat, F_x, F_y
+  
+    REAL(PR), DIMENSION(:,:), POINTER        :: UaFrl
+
+    MaxLogfac = 0
+    IF( Mesh%NsegmtFr <= 0 ) RETURN
+    OPEN(unit=66,file='Climites.data',FORM="formatted", STATUS="old" )
+
+    READ(66,*) Data%Nbord
+    !
+    IF( Data%Nbord <= 0 ) RETURN
+
+    ALLOCATE( Data%Lgn(Data%Nbord)  )
+    ALLOCATE( Data%Lgf1(Data%Nbord) , Data%Lgf2(Data%Nbord) )
+    ALLOCATE( Data%Lgc(Data%Nbord)  , Data%Lgd(Data%Nbord) )
+    ALLOCATE( UaFrl(Data%Nvar, Data%Nbord) )
+    Data%Lgc = 0 ; Data%Lgd=0
+    UaFrl = 0.0_PR   
+    WRITE(6,*) " Maillage Logfac :: ", MINVAL(Mesh%Logfac), MAXVAL(Mesh%Logfac)
+
+    DO  ibord = 1 , Data%nbord 
+       READ(66,*) Data%lgn(ibord), Data%Lgf1(ibord),&
+            & Data%lgf2(ibord), Data%lgc(ibord), Data%lgd(ibord)
+
+       MaxLogfac = MAX( MaxLogfac, Data%lgc(ibord) )
+       SELECT CASE(Data%lgc(ibord))
+       CASE(4)
+          READ(66,*) UaFrl(1:Data%Nvar, ibord)
+       END SELECT
+       
+    END DO
+
+!!$    ! lecture de Sigma dans le cas constant !
+!!$    READ(66,*) Data%Sig(1), Data%Sig(2), Data%Sig(3)
+    Data%Sig = 0.0_PR
+
+    CLOSE(66)
+
+    DO ifac = 1, Mesh%NsegmtFr
+       ilog = Mesh%Logfac(ifac)
+       Found = .FALSE.
+       DO  ibord = 1, Data%nbord , 1
+          IF(ilog>= Data%Lgf1(ibord) .AND. ilog <= Data%Lgf2(ibord)  ) THEN
+             Mesh%Logfac(ifac) = ibord
+             Found             = .TRUE.
+             EXIT
+          END IF
+       END DO
+       IF( .NOT. Found ) THEN
+          WRITE(6,*) " Logique de face non defini " , ilog,  &
+               &    " Data%nbord = ",Data%nbord 
+          WRITE(6,*) " Data%lgn(ibord),         Data%Lgf1(ibord),       &
+               &    Data%lgf2(ibord),         Data%lgc(ibord),       &
+               &    Data%lgd(ibord) "
+          DO  ibord = 1 , Data%nbord , 1
+             WRITE(6,*) Data%lgn(ibord), Data%Lgf1(ibord),&
+                  & Data%lgf2(ibord), Data%lgc(ibord), Data%lgd(ibord)
+          END DO
+          STOP
+       END IF
+    END DO
+
+    MaxLogfac =  Data%nbord   
+
+    ALLOCATE( Data%Fr(MaxLogfac) )
+
+    DO  ibord = 1, Data%nbord , 1
+       SELECT CASE(Data%lgc(ibord))
+          CASE(4)
+             Temp_rad       = UaFrl(1,ibord)
+             fa_x           = UaFrl(2,ibord)
+             fa_y           = UaFrl(3,ibord)
+             Temp_mat       = UaFrl(4,ibord)
+             
+             E              = a_energie * Temp_rad**4
+             F_x            = fa_x * c_lum * E
+             F_y            = fa_y * c_lum * E
+             
+             UaFrl(1,ibord)  = E
+             UaFrl(2,ibord)  = F_x 
+             UaFrl(3,ibord)  = F_y
+             UaFrl(4,ibord)  = Temp_mat
+                          
+             Data%Fr(ibord)%UA => UaFrl(:,ibord) 
+             
+             WRITE(6,*) " ibord = ", ibord, " Ua = ", UaFrl(:,ibord)
+          END SELECT
+       END DO
+       
+    Facmax   = Data%nbord
+
+    ALLOCATE(Data%FacMap(1:Facmax))
+
+    DO ilog = 1, Data%nbord
+       Data%FacMap(ilog) = Data%lgc(ilog)
+    END DO
+    WRITE(6,*) " Data%FacMap(1:Facmax) = ", Data%FacMap(1:Facmax)
+
+
+  END SUBROUTINE DonClimites
+!***************************************************************************!
+
+
+!***************************************************************************!
+  SUBROUTINE Reprise_in(DATA, Mesh, Var, PbName )
+    
+    TYPE(Donnees),     INTENT(inout)    :: DATA
+    TYPE(MeshDef) ,    INTENT(inout)    :: Mesh
+    TYPE(Variables),   INTENT(inout)    :: Var
+    CHARACTER(LEN=*), INTENT(inout)     :: PbName
+    
+    INTEGER             :: is, k, ies, Ndim
+    INTEGER             :: lPbName, lensd2
+    CHARACTER(LEN=70)   :: filename
+
+    IF (Data%impre > 5 )  WRITE(6,*) ' ..... debut de la reprise .... '
+
+    lPbName                          = INDEX(PbName,' ') - 1
+    filename(1:lPbName)              = PbName(1:lPbName)
+    filename(lPbName+1:lPbName+9)    = '.restart '
+    lensd2                           = lPbName+9
+
+    OPEN( UNIT=66, FILE=filename(1:lensd2), FORM='unformatted')
+    REWIND(66)
+  
+    lensd2            = INDEX(filename,' ') - 1
+    IF (Data%impre > 5 ) WRITE (6,*) "    ----------------------------------"
+    IF (Data%impre > 5 ) WRITE(6, *) "   file name:  ", filename(1:lensd2)
+    !     
+    !     Lecture au format restart
+    !     ------------------------    
+    !
+    READ (66) Data%T     , Data%KT
+    !
+    IF (Data%impre > 5 ) WRITE(6, *) " Temps =",Data%T , " Iteration = ", Data%KT
+    IF (Data%impre > 5 ) WRITE(6, *) "    ----------------------------------"
+    Ndim = Data%Ndim
+
+    READ (66) ((Mesh%Coor(k,is), k = 1,Ndim), is = 1,Mesh%Npoint)
+    READ (66) ((Var%Ua(ies,is), is = 1,Var%NCells), ies = 1,Data%Nvar)
+    CLOSE(66)
+
+    IF (Data%impre > 5 ) WRITE(6,*) ' Ua  min =  ' , MINVAL( Var%UA, DIM=2 )
+    IF (Data%impre > 5 ) WRITE(6,*) ' Ua  max =  ' , MAXVAL( Var%UA, DIM=2 )
+    IF (Data%impre > 5 ) WRITE(6,*) ' ..... Fin de la reprise .... '
+
+
+  END SUBROUTINE Reprise_in
+!***************************************************************************!
+
+
+!***************************************************************************!
+  SUBROUTINE Reprise_out(DATA, Mesh, Var, PbName )
+    
+    TYPE(Donnees),     INTENT(inout)    :: DATA
+    TYPE(MeshDef) ,    INTENT(inout)    :: Mesh
+    TYPE(Variables),   INTENT(inout)    :: Var
+    CHARACTER(LEN=*),  INTENT(inout)    :: PbName
+    
+    INTEGER             :: is, k, ies, Ndim
+    INTEGER             :: lPbName, lensd2
+    CHARACTER(LEN=70)   :: filename
+    
+    IF (Data%impre > 5 ) WRITE(6,*) ' ..... debut de la preparation a la reprise .... '
+
+    lPbName                          = INDEX(PbName,' ') - 1
+    filename(1:lPbName)              = PbName(1:lPbName)
+    filename(lPbName+1:lPbName+6)    = '.save '
+    lensd2                           = lPbName+6
+
+    OPEN( UNIT=66, FILE=filename(1:lensd2), FORM='unformatted')
+    REWIND(66)
+    !!
+    lensd2            = INDEX(filename,' ') - 1
+    IF (Data%impre > 5 ) WRITE (6,*) "    ----------------------------------"
+    IF (Data%impre > 5 ) WRITE(6, *) "   file name:  ", filename(1:lensd2)
+    IF (Data%impre > 5 ) WRITE(6, *) "    ----------------------------------"
+    !       
+    !     Ecriture au format restart
+    !     ------------------------    
+    !
+    WRITE (66) Data%T     , Data%KT
+    !
+    Ndim = Data%Ndim
+    !
+    WRITE (66) ((Mesh%Coor(k,is), k = 1,Ndim), is = 1,Mesh%Npoint)
+    WRITE (66) ((Var%Ua(ies,is), is = 1,Var%NCells), ies = 1,Data%Nvar)
+    CLOSE(66)
+    IF (Data%impre > 5 ) WRITE(6,*) ' ..... Fin de la preparation a la reprise .... '
+
+
+  END SUBROUTINE Reprise_out
+!***************************************************************************!
+
+
+!***************************************************************************!
+SUBROUTINE CellVertexVtk(DATA, Mesh, Var, PbName)
+    
+    TYPE(Donnees)   , INTENT(in)     :: DATA
+    TYPE(MeshDef)   , INTENT(in)     :: Mesh
+    TYPE(Variables) , INTENT(in)     :: Var
+    CHARACTER(LEN=70),INTENT(in)     :: PbName
+   
+    REAL(PR)          :: chi, nf, fa_x, fa_y
+    CHARACTER(LEN=75) :: vtk=" "
+    INTEGER           :: is, jt
+    INTEGER           :: lensd3, lPbName
+
+
+    IF (Data%Impre > 5 ) WRITE (6,FMT = *) " --------------------------------------------"
+    IF (Data%Impre > 5 ) WRITE (6,FMT = *) " ---------      passage dans vtk   ----------"
+    IF (Data%Impre > 5 ) WRITE (6,FMT = *) " --------------------------------------------"
+
+    ! ECRITURE sous FICHIER vtk !
+
+    lPbName                    = INDEX(PbName,' ') - 1
+    vtk(1:lPbName)             = PbName(1:lPbName)
+    vtk(lPbName+1:lPbName+5)   = '.vtk '
+    lensd3                     = lPbName+4
+    OPEN(UNIT=61,FILE=vtk(1:lensd3) )
+
+    WRITE(61,'(A)')'# vtk DataFile Version 3.0'
+    WRITE(61,'(A)')'# Solution du M1 TR'
+    WRITE(61,'(A)')'ASCII'
+    WRITE(61,'(A)')'DATASET UNSTRUCTURED_GRID'
+    WRITE(61,'(A,I7,A)')'POINTS', Mesh%Npoint,'  float'
+
+    DO is = 1,Mesh%Npoint
+       WRITE(61,'(E13.7,2x,E13.7,2x,E13.7)') Mesh%coor(1,is), Mesh%coor(2,is), 0.000000000
+    END DO
+    WRITE(61,'(A,1x,I7,1x,I6)')'CELLS',Mesh%Nelemt, 4*Mesh%Nelemt
+
+    DO jt = 1,Mesh%Nelemt
+       WRITE(61,'(I1,1x,I7,1x,I7,1x,I7)') 3, Mesh%Nu(1,jt)-1, Mesh%Nu(2,jt)-1, Mesh%Nu(3,jt)-1
+    END DO
+
+    WRITE(61,'(A,1x,I7)')'CELL_TYPES', Mesh%Nelemt
+    DO jt = 1,Mesh%Nelemt
+       WRITE(61,'(I1)') 5
+    ENDDO
+
+    WRITE(61,'(A,1x,I7)')'POINT_DATA',Mesh%Npoint
+    WRITE(61,'(A)')'SCALARS Energie_Radiative float'
+    WRITE(61,'(A)')'LOOKUP_TABLE DEFAULT'
+
+    DO is = 1,Mesh%Npoint
+       WRITE(61,'(ES20.7)') Var%Ua(1,is)
+    END DO
+
+    WRITE(61,'(A)')'SCALARS Temp_rad float'
+    WRITE(61,'(A)')'LOOKUP_TABLE DEFAULT' 
+    DO is = 1,Mesh%Npoint
+       WRITE(61,'(ES20.7)') (Var%Ua(1,is)/a_energie)**(0.25)
+    END DO
+
+    WRITE(61,'(A)')'SCALARS Temp_mat float'
+    WRITE(61,'(A)')'LOOKUP_TABLE DEFAULT' 
+    DO is = 1,Mesh%Npoint
+       WRITE(61,'(ES20.7)') Var%Ua(4,is)
+    END DO
+
+    WRITE(61,'(A)')'SCALARS Facteur_eddington float'
+    WRITE(61,'(A)')'LOOKUP_TABLE DEFAULT' 
+    DO is = 1,Mesh%Npoint
+       nf = SQRT(Var%Ua(2,is)**2 + Var%Ua(3,is)**2)/(c_lum * Var%Ua(1,is))
+!      chi = 3._PR + 4._PR*nf 
+!      chi = chi / (5._PR + 2._PR*SQRT(4._PR-3._PR*nf))
+       chi = (3._PR + 4._PR*nf)  / (5._PR + 2._PR*SQRT(4._PR-3._PR*nf))
+       WRITE(61,'(ES20.7)') chi
+    END DO
+
+    WRITE(61,'(A)')'VECTORS Facteur_anisotropie float'
+
+    DO is = 1,Mesh%Npoint
+       fa_x = Var%Ua(2,is) / (c_lum * Var%Ua(1,is))
+       fa_y = Var%Ua(3,is) / (c_lum * Var%Ua(1,is))
+       WRITE(61,'(E13.7,2x,E13.7,2x,E13.7)') fa_x, fa_y, 0._PR
+    END DO
+
+    WRITE(61,'(A)')'VECTORS Flux_Radiatif float'
+
+    DO is = 1,Mesh%Npoint
+       WRITE(61,'(E13.7,2x,E13.7,2x,E13.7)') Var%Ua(2,is), Var%Ua(3,is), 0._PR
+    END DO
+
+   
+    CLOSE(61)
+
+    !--   ECRITURE SOUS FORMAT MATLAB   --!
+
+    OPEN(unit=51,file='Matlab_mesh_p.dat')
+    OPEN(unit=52,file='Matlab_mesh_e.dat')
+    OPEN(unit=53,file='Matlab_mesh_t.dat')
+    OPEN(unit=54,file='Matlab_E.dat')
+    OPEN(unit=55,file='Matlab_Fx.dat')
+    OPEN(unit=56,file='Matlab_Fy.dat')
+    OPEN(unit=57,file='Matlab_Temp.dat')
+
+    ! fichier qui contient les coordonnees des points du maillage !
+
+    DO is = 1, Mesh%Npoint
+       WRITE(51,*) Mesh%coor(1,is),Mesh%coor(2,is)
+    ENDDO
+
+    ! fichier qui contient les numeros des segments exterieurs !
+    DO jt = 1, Mesh%NsegmtFr
+       WRITE(52,'(I6,2x,I6,2x,I3,2x,I3,2x,I6,2x,I3)') Mesh%Nsfac(1,jt), Mesh%Nsfac(2,jt), 0,1,Mesh%Nsfac(1,jt), 0
+    ENDDO
+
+    ! fichier qui contient les numeros des sommets des triangles !
+    DO is = 1, Mesh%Nelemt
+       WRITE(53,*) Mesh%Nu(1,is), Mesh%Nu(2,is), Mesh%Nu(3,is), 1
+    ENDDO
+
+    DO is = 1, Mesh%Npoint
+       WRITE(54,*)Var%Ua(1,is)
+       WRITE(55,*)Var%Ua(2,is)
+       WRITE(56,*)Var%Ua(3,is)
+       WRITE(57,*)Var%Ua(4,is)
+    ENDDO
+
+    CLOSE(51)
+    CLOSE(52)
+    CLOSE(53)
+    CLOSE(54)
+    CLOSE(55)
+    CLOSE(56)
+    CLOSE(57)
+
+  END SUBROUTINE CellVertexVtk
+!***************************************************************!
+
+END MODULE IO_INIT

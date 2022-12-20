@@ -163,7 +163,7 @@ PROGRAM Main
   DEALLOCATE ( Var%Ua, Var%Un, Var%NbVois, Var%NuVois )
 
   print*, 'Fin d''execution de Box4SW'
-  print*, ' '
+  print*
 
 
 END PROGRAM Main

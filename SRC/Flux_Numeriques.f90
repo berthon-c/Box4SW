@@ -24,7 +24,6 @@ CONTAINS
     REAL(PR),                INTENT(in)    :: nx, ny
     REAL(PR), DIMENSION(3),  INTENT(in)    :: Ua1, Ua2
     REAL(PR), DIMENSION(3),  INTENT(out)   :: Flux
-
     REAL(PR), DIMENSION(3)                 :: UL, UR, Flux_interface
 
     !calcul des variables primitives dans le repere de l'interface
@@ -150,6 +149,9 @@ CONTAINS
 
   end SUBROUTINE flux_Relaxation_1d
 !**********************************************************************!
+
+ 
+
 
 !**********************************************************************!
   function calcul_a(hL,cL,hR,cR)

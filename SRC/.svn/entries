@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wc-entries
+   xmlns="svn:">
+<entry
+   committed-rev="10"
+   name=""
+   committed-date="2010-04-08T08:16:52.818089Z"
+   url="https://svn.math.cnrs.fr/CHyR_MoKiM/Radbox/V_new_geom/SRC"
+   last-author="csarazin"
+   kind="dir"
+   revision="11"/>
+<entry
+   committed-rev="10"
+   name="Main.f90"
+   text-time="2010-04-08T08:11:04.000000Z"
+   committed-date="2010-04-08T08:16:52.818089Z"
+   checksum="676fab02a74977a7eb42b43379f7128f"
+   last-author="csarazin"
+   kind="file"/>
+<entry
+   committed-rev="10"
+   name="Physique.f90"
+   text-time="2010-04-08T08:11:04.000000Z"
+   committed-date="2010-04-08T08:16:52.818089Z"
+   checksum="4928e78b50eca5ec92e4ed40031746e6"
+   last-author="csarazin"
+   kind="file"/>
+<entry
+   committed-rev="10"
+   name="Numerique.f90"
+   text-time="2010-04-08T08:11:04.000000Z"
+   committed-date="2010-04-08T08:16:52.818089Z"
+   checksum="c3f2c1d1733c07f8d37e6eb496a245fd"
+   last-author="csarazin"
+   kind="file"/>
+<entry
+   committed-rev="10"
+   name="IO_Init.f90"
+   text-time="2010-04-08T08:11:04.000000Z"
+   committed-date="2010-04-08T08:16:52.818089Z"
+   checksum="8ed64fa181c62f1480f0a76891dc35e0"
+   last-author="csarazin"
+   kind="file"/>
+<entry
+   committed-rev="10"
+   name="Var_Types.f90"
+   text-time="2010-04-08T08:11:04.000000Z"
+   committed-date="2010-04-08T08:16:52.818089Z"
+   checksum="f38dd688afdcb133da832bffabb6aca4"
+   last-author="csarazin"
+   kind="file"/>
+<entry
+   committed-rev="10"
+   name="Un_Pas_Temps.f90"
+   text-time="2010-04-08T08:11:04.000000Z"
+   committed-date="2010-04-08T08:16:52.818089Z"
+   checksum="138838cc1ec31e52da15065a6e0a607b"
+   last-author="csarazin"
+   kind="file"/>
+</wc-entries>

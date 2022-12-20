@@ -1,0 +1,94 @@
+MODULE Var_Types
+
+  !!$ Module qui gere les variables globales et les types  !
+ 
+  !---------------------------------------------------------------!
+  !!$ Auteurs : B. Nkonga , C. Berthon, R. Turpault, C. Sarazin
+  !---------------------------------------------------------------!
+  
+
+  IMPLICIT NONE
+
+  INTEGER, PARAMETER     :: PR=KIND(1.0D0)
+
+  REAL(PR), PARAMETER    :: c_lum = 2.99792458e8_PR     ! vitesse de la lumiere
+  REAL(PR), PARAMETER    :: kb    = 1.3806581e-23_PR    ! constante de Boltzmann
+  REAL(PR), parameter    :: hp    = 6.62607554e-34_PR   ! constante de Planck
+  REAL(PR), parameter    :: a_energie = 7.565916E-16_PR ! Er = a_energie * T**4
+
+  REAL(PR), PARAMETER    :: eps       = 1.E-13_PR
+  INTEGER, PARAMETER     :: Dirichlet = 4, Neumann   = 5
+
+  TYPE cellule
+     INTEGER                :: val
+     TYPE(cellule), POINTER :: suiv
+  END TYPE cellule
+
+  TYPE rpointer
+     REAL(PR), DIMENSION(:) , POINTER :: Ua
+  END TYPE rpointer
+
+  TYPE Donnees
+     ! lecture dans NumMeth.data
+  ! ***************************
+     LOGICAL                  :: Reprise
+     INTEGER                  :: Impre   , Icas
+     CHARACTER(LEN=80)        :: RootName, PbName 
+     CHARACTER(LEN=80)        :: MeshFile
+     INTEGER                  :: Ndim    , Nsmplx
+     INTEGER                  :: Nvar    
+     INTEGER                  :: KT     
+     REAL(PR)                 :: DT      , T
+     INTEGER                  :: Iflux   , Ifre   ,  Ifres
+     INTEGER                  :: Ktmax   
+     REAL(PR)                 :: Cfl , Tmax 
+     REAL(PR)                 :: TRIn , fa_xIn ,fa_yIn, TIn
+     REAL(PR), DIMENSION(3)   :: Sig
+
+     ! lecture dans  Climites.data
+     ! ***************************
+     INTEGER                               :: Nbord
+     INTEGER       , DIMENSION(:), POINTER :: lgn, lgf1, lgf2
+     INTEGER       , DIMENSION(:), POINTER :: lgc, lgd
+     INTEGER       , DIMENSION(:), POINTER :: FacMap
+     TYPE(rpointer), DIMENSION(:), POINTER :: Fr
+
+  END TYPE Donnees
+
+  TYPE MeshDef
+     INTEGER                              :: Npoint, Nelemt, NsegmtFr
+     INTEGER, DIMENSION(:),   POINTER     :: Ndegre, NumFac
+     INTEGER, DIMENSION(:),   POINTER     :: Logfac, OldLogfac, Typoint
+     INTEGER, DIMENSION(:,:), POINTER     :: Nu    , Nsfac
+     REAL(PR),    DIMENSION(:,:), POINTER :: Coor  , Coon
+     REAL(PR),    DIMENSION(:),   POINTER :: AirT  , AirS
+  
+  END TYPE MeshDef
+
+  TYPE MeshSeg
+     INTEGER                              :: Nsegmt, Nsegmtot
+     INTEGER, DIMENSION(:)  , POINTER     :: NbVois , NbVoit, Numsegfr
+     INTEGER, DIMENSION(:,:), POINTER     :: Nubo   , Nuseg
+     INTEGER, DIMENSION(:,:), POINTER     :: Nusv   , Nutv
+     INTEGER, DIMENSION(:,:,:), POINTER   :: TabSeg
+     REAL(PR)   , DIMENSION(:,:), POINTER :: Vno, VnoFr, Normext, NormextFr
+  END TYPE MeshSeg
+
+
+  TYPE variables
+     INTEGER                                :: NCells
+     REAL(PR),    DIMENSION(:)    , POINTER :: CellVol
+     REAL(PR),    DIMENSION(:,:)  , POINTER :: Ua, Un
+     REAL(PR),    DIMENSION(:,:)  , POINTER :: Flux  
+     REAL(PR),    DIMENSION(:,:)  , POINTER :: Sig
+
+     ! pour la gestion des voisins
+     INTEGER, DIMENSION(:)    , POINTER :: NbVois  ! nombre de sommets voisins 
+                                                   ! de chaque sommet !
+     INTEGER, DIMENSION(:,:)  , POINTER :: NuVois  ! numero des sommets voisins 
+                                                   ! de chaque sommet !
+
+  END TYPE variables
+
+
+END MODULE Var_Types

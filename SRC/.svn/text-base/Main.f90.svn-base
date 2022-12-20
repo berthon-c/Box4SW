@@ -1,0 +1,186 @@
+PROGRAM Main
+ 
+  ! Code qui résoud le system M1 du TR avec des méthodes !
+  ! de volumes finis en 2D sur un maillage non structuré !
+
+  !! ************************************************************ !!
+  !! Auteurs : B. Nkonga , C. Berthon, R. Turpault, C. Sarazin
+  !!
+  !! ************************************************************ !!
+
+  USE Var_Types
+  USE IO_Init 
+  USE ReadMesh 
+  USE SegmtsGeom
+  USE ParmGeom 
+  USE Physique 
+  USE Numerique
+  USE Un_Pas_Temps 
+
+  IMPLICIT NONE
+
+  TYPE(MeshDef)          :: Mesh
+  TYPE(MeshSeg)          :: Seg
+  TYPE(Variables)        :: Var
+  TYPE(Donnees)          :: DATA
+
+  CHARACTER(LEN=70)      :: BaseMesh, MeshFile, vtkName, MeshType
+
+  REAL(PR)               :: Dt
+  INTEGER                :: Icas  
+  INTEGER                :: Nvar
+  INTEGER                :: lensd
+  REAL(PR), DIMENSION(2) :: Xmin, Xmax
+
+
+  CALL DonNumMeth(DATA)
+  MeshType     = "MESH"
+  Data%PbName  = Data%RootName
+  Data%Impre   = Data%Impre
+  Nvar         = Data%Nvar
+  Icas         = Data%Icas 
+
+  WRITE(6,*) " ________________________________________________"
+  WRITE(6,*) " ________________________________________________"
+  WRITE(6,*) " |                   RadBox                     |"
+  WRITE(6,*) " ------------------------------------------------"
+  WRITE(6,*) "            Resolution du modele M1              "
+  CALL FluxChoisie()
+
+  WRITE(6,*) "  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  WRITE(6,*) "  !!!!!!!         Cas TEST ",Data%PbName(1:20)," !!!!!!" 
+  WRITE(6,*) "  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  WRITE(6,*) " __________________________________________________ "
+
+ 
+  ! -----------------------------------------! 
+  !     LECTURE ET CREATION DU MAILLAGE      !
+  ! -----------------------------------------! 
+  BaseMesh = Data%PbName
+  MeshFile=" "
+  vtkName = Data%PbName
+  IF( Data%Impre > 2 ) WRITE(6, *) ' Nom local du probleme :: ',vtkName 
+
+  SELECT CASE( TRIM(MeshType) )
+  CASE("MESH")
+
+     lensd                     = INDEX(BaseMesh,' ') - 1
+     BaseMesh(lensd+1:lensd+7) = ".mesh " 
+     MeshFile = BaseMesh
+     IF( Data%Impre > 2 )  WRITE(6,*) "Fichier de maillage MeshFile : ",MeshFile
+     CALL ReadMESH2D( Mesh, MeshFile )
+
+  CASE DEFAULT
+     WRITE(6, *) " Maillage de type ",TRIM(MeshType) ," non traite"
+     STOP
+  END SELECT
+
+  IF( Data%Impre > 2 )  WRITE(6,*) " Maillage Lu"
+
+  Xmin = MINVAL( Mesh%coor, DIM=2)
+  Xmax = MAXVAL( Mesh%coor, DIM=2)
+  WRITE(6,*) " Xmin  Ymin ",Xmin
+  WRITE(6,*) " Xmax  Ymax ",Xmax
+
+  ! -----------------------------------------! 
+  !     CALCUL DE LA GEOMETRIE DEBUT         !
+  ! -----------------------------------------! 
+  Var%NCells  =  Mesh%Npoint
+
+   CALL Segments2DP( Mesh, Seg, DATA, Var)
+   CALL compute_voisin(Seg, Var)
+
+
+  IF( Data%Impre > 2 ) WRITE(6,*) "Mesh%NsegmtFr  = ", Mesh%NsegmtFr 
+
+  ! ---------------------------------------------------! 
+  !   LECTURE ET CREATION DES CONDITIONS AUX LIMITES   !
+  ! ---------------------------------------------------!
+!  CALL DonClimites( DATA , Mesh)
+
+  ALLOCATE(  Var%UA(   1:Nvar , 1:Var%NCells) )
+  ALLOCATE(  Var%UN(   1:Nvar , 1:Var%NCells) ) 
+  ALLOCATE(  Var%Sig(  1:Var%NCells, 1:4) ) 
+  ALLOCATE(  Var%Flux( 1:Data%Nvar , 1:Seg%NSegmt) ) ! flux numerique 
+!  ALLOCATE(  Seg%Vno(  1:2, 1:Seg%Nsegmt) )
+  ALLOCATE(  Seg%Vno(  1:2, 1:Seg%Nsegmtot) )
+!  ALLOCATE(  Seg%VnoFr(1:2, 1: Mesh%NsegmtFr ))
+  ALLOCATE(  Seg%Normext(1:2, 1:Seg%Nsegmtot)  )! Normale sortante (normalisee) !
+!  ALLOCATE(  Seg%NormextFr(1:3, 1:Seg%Nsegmt ) )! Normale sortante a la frontiere !
+  ALLOCATE(  Mesh%Airt( 1:Mesh%Nelemt ) )
+  ALLOCATE(  Mesh%Airs( 1:Mesh%Npoint ) )
+
+  NULLIFY( Var%CellVol )
+  Var%CellVol => Mesh%Airs
+  Var%Sig = 0._PR
+
+  ! -----------------------------------------! 
+  !        INITIALISATION OU REPRISE         !
+  ! -----------------------------------------! 
+
+!!$  IF( DATA%Reprise ) THEN
+!!$     CALL Reprise_in(DATA, Mesh, Var, vtkName)
+!!$     IF( DATA%Icas >= 30 .AND. DATA%Icas < 40 ) THEN
+!!$        DATA%KT = 0
+!!$        DATA%T  = 0.0_PR
+!!$     END IF
+!!$  ELSE
+!!$     SELECT CASE(DATA%Icas)
+!!$     CASE(1)
+!!$        CALL Tube_a_chocs_1D_En_x(DATA, Mesh, Var)
+!!$     CASE DEFAULT
+!!$        CALL Solution_Constante(DATA, Var)
+!!$     END SELECT
+!!$
+!!$     Data%T  = 0.0_PR
+!!$     Data%KT = 0
+!!$  END IF
+  
+  ! -----------------------------------------! 
+  !      CALCUL DE LA GEOMETRIE FIN          !
+  ! -----------------------------------------! 
+  Mesh%Coon = Mesh%Coor
+  print*,'avant cellervtex'
+  CALL CellVertexMvvno(Mesh, Seg, Dt)
+  CALL GeomAires(Mesh)
+ ! CALL compute_voisin(Seg, Var)
+
+  ! -----------------------------------------! 
+  !   ENREGISTREMENT DES DONNEES INITIALES   !
+  ! -----------------------------------------! 
+  IF( Data%Impre > 2 ) THEN 
+     CALL  CellVertexvtk(DATA, Mesh, Var, vtkName )
+  END IF
+
+  ! -----------------------------------------! 
+  !           ITERATIONS EN TEMPS            !
+  !      + ENREGISTREMENT DES RESULTATS      !
+  ! -----------------------------------------!
+
+  CALL PasDeTemps(Seg, Var, Dt)
+  CALL boucle_en_temps(Mesh, Seg,  Var, DATA, vtkName, Dt)
+  
+  ! ---------------------------------------------------!
+  !       CREATION DU FICHIER DE REPRISE               !
+  ! ---------------------------------------------------!
+  CALL Reprise_out(DATA, Mesh, Var, vtkName)
+
+  DEALLOCATE (  Var%Ua, Var%Un, Var%Sig, Var%Flux, Seg%Vno, Mesh%Airt, Mesh%Airs )
+
+CONTAINS
+
+
+  SUBROUTINE FluxChoisie()
+    SELECT CASE (DATA%Iflux)
+    CASE(2) 
+       WRITE(6,*)  "             Flux HLL            "
+
+    CASE DEFAULT 
+       WRITE(6,*)  " Flux  pas code "
+       STOP
+    END SELECT
+
+  END SUBROUTINE FluxChoisie
+
+
+END PROGRAM Main

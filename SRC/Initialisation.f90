@@ -42,7 +42,10 @@ CONTAINS
        
     CASE(2) ! initialisation rupture de barrage sur fond sec
        CALL Tube_a_chocs_1D_En_x(DATA, Mesh, Var)
-       
+
+    CASE(3) ! initialisation sur fond sec
+       CALL Tube_a_chocs_1D_En_x(DATA, Mesh, Var)
+
     CASE DEFAULT
        print*,"initialisation demandee non codee Icas=",DATA%Icas
        STOP
@@ -81,6 +84,12 @@ CONTAINS
 
     CASE(2)
        CALL Init_barrage_fond_sec(hL,uxL,uyL,hR,uxR,uyR)
+
+    CASE(3)
+       CALL Init_Fond_sec(hL,uxL,uyL)
+       hR  = hL
+       uxR = uxL
+       uyR = uyL
 
      CASE DEFAULT
         print*,"initialisation UL et UR non codee Icas=",DATA%Icas
@@ -157,6 +166,18 @@ CONTAINS
   !************************************************************************!
 
   !************************************************************************!
+  SUBROUTINE Init_Fond_Sec(h,ux,uy)
+
+    REAL(PR), INTENT(out)   :: h,ux,uy
+    
+    h  = 0.01_PR
+    ux = 0.0_PR
+    uy = 0.0_PR
+
+  END SUBROUTINE Init_Fond_Sec
+  !**************************************************************************!
+
+  !************************************************************************!
   SUBROUTINE Init_Constante(h,ux,uy)
 
     REAL(PR), INTENT(out)   :: h,ux,uy
@@ -168,5 +189,6 @@ CONTAINS
   END SUBROUTINE Init_Constante
   !**************************************************************************!
 
+  
 END MODULE Initialisation
 

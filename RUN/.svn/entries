@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wc-entries
+   xmlns="svn:">
+<entry
+   committed-rev="10"
+   name=""
+   committed-date="2010-04-08T08:16:52.818089Z"
+   url="https://svn.math.cnrs.fr/CHyR_MoKiM/Radbox/V_new_geom/RUN"
+   last-author="csarazin"
+   kind="dir"
+   revision="11"/>
+<entry
+   name="TR"
+   kind="dir"/>
+</wc-entries>

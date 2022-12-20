@@ -24,8 +24,8 @@ CONTAINS
     SELECT CASE (icl)
 
     CASE(3) 
-       !CALL CL_Neumann(Ua1, Ua2)
-       CALL CL_wall(Ua1, Ua2)
+       CALL CL_Neumann(Ua1, Ua2)
+       !CALL CL_wall(Ua1, Ua2)
 
     CASE DEFAULT
        WRITE(6,*) " La condition aux limites  ", icl, " n est pas traitee"

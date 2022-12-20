@@ -1,0 +1,333 @@
+MODULE Un_Pas_Temps
+
+  !!$ Module qui gere les iterations en temps !
+  !---------------------------------------------------------------!
+  !!$ Auteurs : B. Nkonga , C. Berthon, R. Turpault, C. Sarazin
+  !---------------------------------------------------------------!
+
+  !!$ listes des subroutines : 
+  !!$ - boucle_en_temps 
+  !!$ - affiche_resu
+  !!$ - pas_de_temps
+
+  USE readmesh
+  USE Var_Types
+  USE IO_Init
+  USE Numerique
+
+  IMPLICIT NONE
+
+CONTAINS
+
+!***********************************************************************!
+  SUBROUTINE boucle_en_temps(Mesh, Seg, Var, DATA, vtkName, Dt0)
+
+    TYPE(MeshDef),INTENT(inout)      :: Mesh
+    TYPE(MeshSeg),INTENT(in)         :: Seg
+    TYPE(Variables),INTENT(inout)    :: Var
+    TYPE(Donnees),INTENT(inout)      :: DATA
+
+    REAL(PR),INTENT(in)     :: Dt0
+    INTEGER                 :: is, is1, is2, iseg, file_count
+    INTEGER                 :: Impre
+    INTEGER                 :: kt, kt0
+    REAL(PR)                :: Temps, CFL, Dt, rdenom1, rdenom2
+    REAL(PR), DIMENSION(1:DATA%Nvar)  :: Ua1, Ua2 ,Umin, Umax
+    REAL(PR), DIMENSION(1:DATA%Nvar)  :: Flux
+    CHARACTER(LEN=70),INTENT(INOUT)  :: vtkName
+      
+    OPEN( UNIT=16, FILE='evolve.time', FORM='formatted')
+    REWIND(16)
+
+    Impre   = Data%Impre
+    Temps   = DATA%T
+    kt0     = DATA%KT
+    CFL     = Data%Cfl
+
+    print*,'Nombre d iterations initial : ',kt0
+    file_count = (kt0/Data%ifres)+1
+
+    print*,'Nsegmt',Seg%Nsegmt
+    print*,'Ncells',Var%Ncells
+    print*,'NsegmtFr',Mesh%NsegmtFr
+    print*,'Nsfac(1)',Mesh%Nsfac(1,:)
+    print*,'Nsfac(2)',Mesh%Nsfac(2,:)
+    print*,'Numfac',Mesh%Numfac
+    print*,'Data%FacMap',Data%FacMap
+    print*,'Mesh%Logfac',Mesh%Logfac
+    print*,'Nubo(1)',Seg%Nubo(1,:)
+    print*,'Nubo(2)',Seg%Nubo(2,:)
+
+    stop
+
+  
+    Dt = Dt0
+
+    IF( Impre > 2 ) WRITE(6,*)  " Debut de la boucle en temps :: Maillage Fixe"
+
+    !----------------------------------------------------!
+    !            DEBUT DE LA BOUCLE EN TEMPS             !
+    !----------------------------------------------------!
+
+    DO kt = kt0+1, DATA%Ktmax
+
+       ! verification de la positivite de l'energie radiative !
+       DO is = 1,Var%Ncells
+          IF (Var%Ua(1,is) <= 0._PR) THEN
+             WRITE(6,*) 'Erreur verif : energie radiative negative',var%Ua(1,is),' a l indice is = ',is
+             WRITE(6,*) 'Arret a l iteration', kt,' au temps t:',temps
+             STOP
+          END IF
+
+       END DO
+
+      !----------------------------------------------------!
+      !            MISE A JOUR DU PAS DE TEMPS             !
+      !----------------------------------------------------!
+
+       Dt = MIN(Dt,  Data%Tmax - Temps)
+
+     !  CALL  FluxCellVertex(DATA, Seg, Var)
+       ! Calcul du flux numerique, Boucle sur les interfaces ! 
+       !*****************************************************!
+          DO iseg = 1,Seg%Nsegmt
+
+          Var%Flux(:,iseg)   = 0.0_PR
+          !
+          is1 = Seg%Nubo(1,iseg)
+          is2 = Seg%Nubo(2,iseg)
+          
+          DO is = 1, 4
+             Ua1(is) = Var%Ua(is,is1) 
+             Ua2(is) = Var%Ua(is,is2) 
+          END DO
+          
+          !  Calcul du flux a l'interface entre la cell is1 et la cell is2  !
+          !*****************************************************************!
+          SELECT CASE (DATA%Iflux)
+             
+          CASE(2)
+             CALL fluxhll (Seg%Normext(1,iseg),Seg%Normext(2,iseg),Ua1,Ua2,Flux)
+             
+          CASE DEFAULT 
+             PRINT*,'Flux non code '
+             STOP
+          END SELECT
+
+          !  Normalisation du Flux   !
+          !**************************!
+          DO is = 1, 4
+             Var%Flux(is,iseg) = Seg%Normext(3,iseg)*Flux(is)
+          ENDDO
+          
+       ENDDO
+
+!!$        DO is = 1, 4
+       ! calcul du flux total entrant dans la cellule is1 !
+!!$          Var%Flux(is,is1) = Var%Flux(is,is1) + norm*Flux(is)
+       ! calcul du flux total sortant de la cellule is2 !
+!!$          Var%Flux(is,is2) = Var%Flux(is,is2) - norm*Flux(is)
+!!$       END DO
+
+
+       IF(Impre >2  .AND. kt==1) WRITE(6,*) " Flux a l interieur du domaine "
+
+       CALL  FluxCellVertex_bord(Mesh, Seg, Var, DATA)
+       DO iseg = 1, Mesh%NsegmtFr
+          print*,'iseg',iseg,'Var%Flux(:,iseg)',Var%Flux(:,iseg)
+       enddo
+
+
+       IF(Impre >2  .AND. kt==1) THEN
+          WRITE(6,*) " FluxCellVertex_bord "
+          WRITE(6,*) " Explicite mis a jour"
+          WRITE(6,*) " Volume Min = ", MINVAL( Var%CellVol)
+          WRITE(6,*) " Volume Max = ", MAXVAL( Var%CellVol)
+       END IF
+
+       !----------------------------------------------------!
+       !                 SCHEMA NUMERIQUE                   !
+       !----------------------------------------------------!
+       DO is = 1, Var%Ncells
+          Var%Un(:,is) = 0._PR
+       ENDDO
+
+       ! Boucle sur les segments de l'interieur du domaine !
+       DO iseg = 1, Seg%Nsegmt
+          
+          is1 = Seg%Nubo(1,iseg)
+          is2 = Seg%Nubo(2,iseg)
+          
+          rdenom1 = Dt / Var%CellVol(is1)
+          rdenom2 = Dt / Var%CellVol(is2)
+
+          Var%Un(:,is1) = Var%Un(:,is1) + Var%Ua(:,is1) - Var%Flux(:,iseg)*rdenom1
+          Var%Un(:,is2) = Var%Un(:,is2) + Var%Ua(:,is2) + Var%Flux(:,iseg)*rdenom2
+          
+       ENDDO
+
+       ! Boucle sur les segments frontiere !
+       DO iseg = 1, Mesh%NsegmtFr
+          
+          is1 = Mesh%Numfac(iseg)
+                 
+          rdenom1 = Dt / Var%CellVol(is1)
+     
+          print*,'iseg',iseg,'is1',is1,'Var%Flux(:,iseg)',Var%Flux(:,iseg)
+          Var%Un(:,is1) = Var%Un(:,is1) + Var%Ua(:,is1) - Var%Flux(:,iseg)*rdenom1
+               
+       ENDDO
+
+
+       DO is = 1, Var%Ncells
+          Var%Ua(1,is) = Var%Un(1,is)
+          Var%Ua(2,is) = Var%Un(2,is)
+          Var%Ua(3,is) = Var%Un(3,is)
+          Var%Ua(4,is) = Var%Un(4,is)
+       ENDDO
+
+!!$
+!!$       DO is = 1, Var%Ncells
+!!$          rdenom = Dt / Var%CellVol(is)
+!!$          Var%Un(1,is) = Var%Ua(1,is) - Var%Flux(1,is)*rdenom
+!!$          Var%Un(2,is) = Var%Ua(2,is) - Var%Flux(2,is)*rdenom
+!!$          Var%Un(3,is) = Var%Ua(3,is) - Var%Flux(3,is)*rdenom
+!!$          Var%Un(4,is) = Var%Ua(4,is) - Var%Flux(4,is)*rdenom
+!!$          Var%Ua(1,is) = Var%Un(1,is)
+!!$          Var%Ua(2,is) = Var%Un(2,is)
+!!$          Var%Ua(3,is) = Var%Un(3,is)
+!!$          Var%Ua(4,is) = Var%Un(4,is)
+!!$       END DO
+
+       IF(Impre >2  .AND. kt==1) WRITE(6,*) " Explicite fin mis a jour"
+
+       !----------------------------------------------------!
+       !                 MISE A JOUR de U                   !
+       !----------------------------------------------------!
+       IF(Impre >2  .AND. kt==1) WRITE(6,*) " Var%Ua = Var%Un "
+
+       Temps       = Temps + Dt
+       DATA%T      = Temps
+       DATA%kt     = kt
+    
+       IF(Impre >2  .AND. kt==1) WRITE(6,*) " Affichages "
+
+       IF (Impre >2  .AND. MOD(kt,Data%ifre) .EQ. 0 ) THEN
+          CALL afficheResu(6)
+          CALL afficheResu(16)
+       END IF
+
+       IF( ABS(Temps - Data%Tmax) .LT. eps) EXIT
+
+       IF (MOD(kt,Data%ifres) .EQ. 0 ) THEN
+          VtkName = " "
+          CALL rename(file_count, 4, VtkName, Data%PbName  )
+          file_count = file_count + 1
+      
+          CALL CellVertexvtk(DATA, Mesh, Var, vtkName )
+
+          CALL Reprise_out(DATA, Mesh, Var, vtkName)
+
+       END IF
+    END DO
+   
+
+    IF( Impre > 2 ) WRITE(6,*)  " Fin  de la boucle en temps "
+    CALL afficheResu(6)
+    CALL afficheResu(16)
+
+    !-----------------------------------------!
+    !   ENREGISTREMENT DES RESULTATS FINAUX   !
+    !-----------------------------------------!
+
+    vtkName = " "
+    CALL rename(file_count, 4, VtkName, Data%PbName)
+    print*,'dans pas de temps , vtkname :',vtkname
+    CALL  CellVertexvtk(DATA, Mesh, Var, vtkName  )
+
+111 FORMAT( I5,1x, 2(E15.6,1x),I5 )
+
+
+  CONTAINS
+    !********************************!
+    SUBROUTINE  afficheResu(argunit)
+
+      INTEGER, INTENT(in) :: argunit
+      
+199   FORMAT(":::::::::::::::::::::::::::::::::::::::::::::::::&
+           &:::::::::::::::::::::::::::::::")
+189   FORMAT("::  ----------------------------&
+           &------------------                            ::" )
+187   FORMAT("::                                               &
+           &                             ::")
+
+      WRITE(argunit,*)
+      WRITE(argunit,199)
+      WRITE(argunit,189)
+      WRITE(argunit,'("::    |",&
+           &"|  Temps = ", E10.3, " |      ",&
+           &"  kt =  " ,I7,"      ::"  )' ) Temps, kt
+      WRITE(argunit,'(":: |    Dt =  ", E10.3,1x, &
+           &   "  ||    Cfl = ", E10.3, " |&
+           &                           ::"  )' ) Dt , Dt/Dt0
+      WRITE(argunit,189)
+
+      WRITE(argunit,187)
+
+      Umin = MINVAL( Var%Ua, DIM=2 )
+      Umax = MAXVAL( Var%Ua, DIM=2 )
+      IF(kt==1)  WRITE(6,'(":: Ua  min     =  ", 4(3x,E12.5)," Me =  ", I5)') Umin
+      IF(kt==1)  WRITE(6,'(":: Ua  max     =  ", 4(3x,E12.5)," Me =  ", I5)') Umax
+
+      WRITE(argunit,'("::  Ua  min   =  ", 4(3x,E12.5), " ::" )') Umin
+      WRITE(argunit,'("::  Ua  max   =  ", 4(3x,E12.5), " ::" )') Umax
+      WRITE(argunit,199) 
+
+
+    END SUBROUTINE afficheResu
+    !**********************************!
+    
+
+  END SUBROUTINE boucle_en_temps
+  !***********************************************************************!
+
+
+  !***********************************************************************!
+  SUBROUTINE PasDeTemps(Seg, Var, Dt)
+   
+    TYPE(Variables)              :: Var
+    TYPE(MeshSeg)   ,INTENT(in)  :: Seg
+    REAL(PR), INTENT(out)        :: Dt
+
+    INTEGER        :: is1, is2, iseg
+    REAL(PR)       :: haut, minhaut
+    REAL(PR)       :: rnormq, maxVP
+
+
+    maxVP = c_lum
+
+    ! calcul de la hauteur de triangle la plus petite
+    minhaut = 1.E10_PR
+
+    DO iseg = 1, Seg%Nsegmt
+
+       rnormq= 0.5_PR / SQRT(Seg%Vno(1,iseg)**2+Seg%Vno(2,iseg)**2)
+       is1   = Seg%Nubo(1,iseg)
+       is2   = Seg%Nubo(2,iseg)
+
+       haut    = Var%CellVol(is1)*rnormq
+       minhaut = MIN(minhaut,haut)
+
+       haut    = Var%CellVol(is2)*rnormq
+       minhaut = MIN(minhaut,haut)
+
+    END DO
+
+    Dt = minhaut/maxVP
+
+
+  END SUBROUTINE PasDeTemps
+  !***********************************************************************!
+
+
+END MODULE Un_Pas_Temps

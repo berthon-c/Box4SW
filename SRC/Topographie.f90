@@ -31,6 +31,9 @@ CONTAINS
        case(4)
           call topo_canal_bosse(DATA, Mesh, Var)
 
+       case(5)
+          call topo_pente(DATA, Mesh, Var)
+             
        case default
           call topo_plate(DATA)
 
@@ -184,5 +187,57 @@ CONTAINS
   END SUBROUTINE topo_parabolic
   !************************************************************************!
 
+  !************************************************************************!
+
+  SUBROUTINE topo_pente(DATA, Mesh, Var)
+
+    TYPE(Donnees),     INTENT(inout)    :: DATA
+    TYPE(MeshDef) ,    INTENT(inout)    :: Mesh
+    TYPE(Variables),   INTENT(inout)    :: Var
+
+    INTEGER            :: is
+    REAL(PR)           :: x, y
+    REAL(PR)           :: Xmin, Xmax, Xmil
+    REAL(PR)           :: Ymin, Ymax, Ymil
+    REAL(PR)           :: Theta
+
+    Theta = 0.2_PR     ! angle de la pente
+    DATA%Z = 0.0_PR    ! Z0 de reference
+
+    Xmax = 0.0_PR
+    Xmin = 0.0_PR
+
+    DO is = 1, Var%Ncells
+       Xmax = Max(Xmax, Mesh%coor(1,is) )
+       Xmin = Min(Xmin, Mesh%coor(1,is) )
+    END DO
+    Xmil = 0.5_PR*(Xmin + Xmax)
+
+    Ymax = 0.0_PR
+    Ymin = 0.0_PR
+
+    DO is = 1, Var%Ncells
+       Ymax = Max(Ymax, Mesh%coor(2,is) )
+       Ymin = Min(Ymin, Mesh%coor(2,is) )
+    END DO
+    Ymil = 0.5_PR*(Ymin + Ymax)
+
+    DO is = 1, Var%NCells
+       x = Mesh%coor(1,is)
+       y = Mesh%coor(2,is)
+
+       DATA%Z(is) = (x-Xmin)*cos(Theta)      
+
+   END DO
+   IF (Data%impre > 1 ) WRITE(6,*) ' X  min =  ' , Xmin
+   IF (Data%impre > 1 ) WRITE(6,*) ' X  max =  ' , Xmax
+   IF (Data%impre > 1 ) WRITE(6,*) ' Y  min =  ' , Ymin
+   IF (Data%impre > 1 ) WRITE(6,*) ' Y  max =  ' , Ymax
+   IF (Data%impre > 1 ) WRITE(6,*) ' Z  min =  ' , MINVAL( DATA%Z )
+   IF (Data%impre > 1 ) WRITE(6,*) ' Z  max =  ' , MAXVAL( DATA%Z )
+    IF (Data%impre > 1 ) WRITE(6,*) ' ..... Fin de l''initialisation topo.... '
+
+  END SUBROUTINE topo_pente
+  !************************************************************************!
 
 END MODULE Topographie

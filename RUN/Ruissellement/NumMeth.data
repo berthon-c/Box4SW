@@ -1,0 +1,10 @@
+Ruissellement                   :::  Nom du cas
+.F.                      	:::  DATA%Restart 
+  3         3       5      	:::  Data%Impre, Data%Icas, Data%Itopo
+  1         0       2           :::  Data%Isource_topo, Data%Isource_friction, Data%Isource_pluie   
+  2                     	:::  Data%Ndim                                 
+  1    200    10                :::  Data%Iflux, Data%Ifre, Data%Ifres 
+0.5E+00                    	:::  Data%CFlMax                           
+ 1.5E-0    20000           	:::  Data%Tmax, Data%Ktmax   
+
+

@@ -1,0 +1,75 @@
+MODULE Physique
+
+  !!$ Module qui gere la physique du TR  !
+  !---------------------------------------------------------------!
+  !!$ Auteurs : B. Nkonga , C. Berthon, R. Turpault, C. Sarazin
+  !---------------------------------------------------------------!
+
+  !!$ listes des subroutines : 
+  !!$ - MaxValeurPropre
+  !!$ - Facteur_Eddington
+  !!$ - Tenseur_Eddington
+ 
+  USE var_types
+
+  IMPLICIT NONE
+
+CONTAINS
+
+  !***********************************************************************!
+  FUNCTION MaxValeurPropre() RESULT (Mvp)
+    
+    REAL(PR)                 :: Mvp
+    
+    Mvp = c_lum 
+
+
+  END FUNCTION MaxValeurPropre
+  !***********************************************************************!
+
+  !**********************************************************************!
+! FUNCTION Facteur_Eddington(nf)
+!   
+!   REAL(PR), INTENT(in) :: nf
+!   REAL(PR) :: Facteur_Eddington
+!
+!
+!   Facteur_Eddington  = 3._PR + 4._PR*nf
+!   Facteur_Eddington  = Facteur_Eddington / (5._PR + 2._PR*SQRT(4._PR-3._PR*nf))
+!   
+!
+! END FUNCTION Facteur_Eddington
+!**********************************************************************!
+
+
+!**********************************************************************!
+  FUNCTION Tenseur_Eddington(Ua)
+
+    REAL(PR)  :: A, B, Chi, nor_fac_anis, nor_fac_anis2
+    REAL(PR), DIMENSION(1:4), INTENT(in) :: Ua
+    REAL(PR), DIMENSION(1:2) :: fac_anis
+    REAL(PR), DIMENSION(1:2,1:2) :: Tenseur_Eddington
+
+    fac_anis(1:2) = Ua(2:3)/(c_lum * Ua(1))
+    nor_fac_anis2 = fac_anis(1)**2 + fac_anis(2)**2
+    nor_fac_anis  = SQRT(nor_fac_anis2)
+    Chi = (3._PR + 4._PR*nor_fac_anis) / (5._PR + 2._PR*SQRT(4._PR-3._PR*nor_fac_anis) )
+
+    A = (1._PR - Chi) * 0.5_PR
+    B = (3._PR * Chi -1._PR) * 0.5_PR
+    IF(nor_fac_anis >= eps) THEN
+       Tenseur_Eddington = B / nor_fac_anis2
+    ELSE
+       Tenseur_Eddington = 0._PR
+    ENDIF
+    Tenseur_Eddington(1,1) = A + Tenseur_Eddington(1,1) * fac_anis(1)**2
+    Tenseur_Eddington(1,2) = Tenseur_Eddington(1,2) * fac_anis(1) * fac_anis(2)
+    Tenseur_Eddington(2,1) = Tenseur_Eddington(1,2)
+    Tenseur_Eddington(2,2) = A + Tenseur_Eddington(2,2) * fac_anis(2)**2
+
+
+  END FUNCTION Tenseur_Eddington
+!**********************************************************************!
+
+
+END MODULE Physique

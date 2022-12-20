@@ -1,0 +1,278 @@
+MODULE Numerique
+
+  !!$ Module qui gere le schema numerique  !
+  !---------------------------------------------------------------!
+  !!$ Auteurs : B. Nkonga , C. Berthon, R. Turpault, C. Sarazin
+  !---------------------------------------------------------------!
+
+  !!$ listes des subroutines : 
+  !!$ - FluxCellVertex
+  !!$ - FluxCellVertex_bord
+  !!$ - GodunovTypeFlux
+  !!$ - fluxhll
+
+  USE var_types
+  USE physique
+ 
+  IMPLICIT NONE
+
+CONTAINS
+
+!********************************************************************!
+  SUBROUTINE FluxCellVertex( DATA, Seg, Var)
+
+    TYPE(MeshSeg)   ,INTENT(in)       :: Seg
+    TYPE(Variables) ,INTENT(inout)    :: Var
+    TYPE(Donnees)   ,INTENT(in)       :: DATA
+  
+    INTEGER :: Iflux, Nseg, iseg
+    INTEGER :: is, is1, is2
+  
+    REAL(PR), DIMENSION(SIZE(Var%UA,DIM=1))   :: Ua1, Ua2
+    REAL(PR), DIMENSION(SIZE(Var%flux,DIM=1)) :: Flux
+
+    Iflux  = Data%Iflux
+    Nseg   = Seg%Nsegmt
+  
+    ! Calcul du flux avec les valeurs aux interfaces !
+    DO iseg = 1,Nseg
+       !
+       is1 = Seg%Nubo(1,iseg)
+       is2 = Seg%Nubo(2,iseg)
+
+       DO is = 1, 4
+          Ua1(is) = Var%Ua(is,is1) 
+          Ua2(is) = Var%Ua(is,is2) 
+       END DO
+
+       !     Calcul du flux entre deux etats 
+       !     *******************************
+       CALL GodunovTypeFlux(Iflux,Seg%Normext(1,iseg),Seg%Normext(2,iseg),Ua1,Ua2,Flux)
+       DO is = 1, 4
+          Var%Flux(is,iseg) = Seg%Normext(3,iseg)*Flux(is)
+       ENDDO
+       
+!!$       DO is = 1, 4
+!!$          Var%Flux(is,is1) = Var%Flux(is,is1) + norm*Flux(is)
+!!$          Var%Flux(is,is2) = Var%Flux(is,is2) - norm*Flux(is)
+!!$       END DO
+
+    END DO
+
+  END SUBROUTINE FluxCellVertex
+!*******************************************************************!
+
+
+!*******************************************************************!
+SUBROUTINE FluxCellVertex_bord(Mesh, Seg, Var, DATA)
+   
+    TYPE(MeshDef)   ,INTENT(in)        :: Mesh
+    TYPE(MeshSeg)   ,INTENT(in)        :: Seg
+    TYPE(Variables) ,INTENT(inout)     :: Var
+    TYPE(Donnees)   ,INTENT(in)        :: DATA
+
+    INTEGER                           :: Nsegmtfr
+    INTEGER, DIMENSION(:)  , POINTER  :: Ndegre, Logfac, NumFac
+    INTEGER, DIMENSION(:,:), POINTER  :: Nu, Nsfac, Nutv
+    REAL(PR),DIMENSION(:,:), POINTER  :: Ua,  Coor
+    
+    INTEGER     :: ilog, is, is1, is2, iseg, ifr, inum, jt, Iflux
+    REAL(PR)    :: norm, nx, ny
+      
+    REAL(PR), DIMENSION(SIZE(Var%Ua, Dim=1))   :: flux12 
+    REAL(PR), DIMENSION(SIZE(Var%Ua, Dim=1))   :: wc1, wc2
+    REAL(PR), DIMENSION(SIZE(Var%Ua, Dim=1),SIZE(Var%Ua, Dim=1))  :: Sym
+    
+    IF( Mesh%NsegmtFR <= 0 ) RETURN
+
+    NULLIFY( Ndegre, Nu, Coor, Numfac, Nsfac, Logfac )
+    NULLIFY( Nutv )
+    NULLIFY( Ua )
+
+    Ndegre   =>Mesh%Ndegre
+    Nu       =>Mesh%Nu
+    Coor     =>Mesh%Coor
+    Nsfac    =>Mesh%Nsfac
+    Numfac   =>Mesh%Numfac
+    Logfac   =>Mesh%Logfac
+    NsegmtFR = Mesh%NsegmtFR
+
+    Nutv     =>Seg%Nutv
+   
+    Ua       =>Var%Ua
+
+    Sym(1, 1:4) = (/1.0_PR, 0.0_PR, 0.0_PR, 0.0_PR /)
+    Sym(4, 1:4) = (/0.0_PR, 0.0_PR, 0.0_PR, 1.0_PR /)
+
+    !--------------------------------------------!
+    !     Boucle sur les segments frontieres
+    !--------------------------------------------!
+    DO ifr = 1, NsegmtFr
+       
+       iseg = NumFac(ifr)
+       jt   = nutv(2,iseg)  ! indice du sommet !
+       IF( jt .NE. 0 ) CYCLE
+       
+       is1   = Nsfac(1,ifr)
+       is2   = Nsfac(2,ifr)
+
+       nx    = Seg%NormextFr(1, ifr)
+       ny    = Seg%NormextFr(2, ifr)
+       norm  = 0.5_PR * Seg%NormextFr(3, ifr)
+      
+       inum  = Logfac(ifr)
+       ilog  = Data%FacMap( Logfac(ifr) )
+
+       !     Calcul du flux entre deux etats 
+       !     *******************************
+       !
+       SELECT CASE (ilog)
+       CASE(2,0)  ! symetrie !
+          Sym(2, 1:4) = (/ 0.0_PR, -nx*nx + ny*ny, -2.0_PR*nx*ny,     0.0_PR /)
+          Sym(3, 1:4) = (/ 0.0_PR, -2.0_PR*nx*ny , -(-nx*nx + ny*ny), 0.0_PR /)
+
+          DO is = 1, 4
+             wc1(is) = Ua(is,is1)
+          END DO
+          wc2(1:4) = MATMUL( Sym, Wc1)
+
+          Iflux = DATA%Iflux
+
+          CALL GodunovTypeFlux(Iflux,nx,ny,Wc1,Wc2,Flux12)
+          DO is = 1, 4
+          !   Var%Flux(is,is1) = Var%Flux(is,is1) + norm*Flux12(is)
+             Var%Flux(is,iseg) = Var%Flux(is,iseg) + norm*Flux12(is)
+             wc1(is) = Ua(is,is2)
+          END DO
+          wc2(1:4) = MATMUL( Sym, Wc1)
+
+          CALL GodunovTypeFlux(Iflux,nx,ny,Wc1,Wc2,Flux12)
+          DO is = 1, 4
+          !   Var%Flux(is,is2) = Var%Flux(is,is2) + norm*Flux12(is)
+             Var%Flux(is,iseg) = Var%Flux(is,iseg) + norm*Flux12(is)
+          END DO
+
+       CASE(Neumann) 
+          DO is = 1, 4
+             wc1(is) = Ua(is,is1)
+             wc2(is) = Ua(is,is1)
+          END DO
+
+          Iflux = DATA%Iflux
+
+          CALL GodunovTypeFlux(Iflux,nx,ny,Wc1,Wc2,Flux12)
+          DO is = 1, 4
+          !   Var%Flux(is,is1) = Var%Flux(is,is1) + norm*Flux12(is)
+             Var%Flux(is,iseg) = Var%Flux(is,iseg) + norm*Flux12(is)
+             wc1(is) = Ua(is,is2)
+             wc2(is) = Ua(is,is2)
+          END DO
+
+          CALL GodunovTypeFlux(Iflux,nx,ny,Wc1,Wc2,Flux12)
+          DO is = 1, 4
+          !   Var%Flux(is,is2) = Var%Flux(is,is2) + norm*Flux12(is)
+             Var%Flux(is,iseg) = Var%Flux(is,iseg) + norm*Flux12(is)
+          END DO
+
+       CASE(Dirichlet) 
+          DO is = 1, 4
+             wc1(is) = Ua(is,is1)
+             wc2(is) = Data%Fr(inum)%Ua(is)
+          END DO
+
+          Iflux = DATA%Iflux
+
+          CALL GodunovTypeFlux(Iflux,nx,ny,Wc1,Wc2,Flux12)
+          DO is = 1, 4
+          !   Var%Flux(is,is1) = Var%Flux(is,is1) + norm*Flux12(is)
+             Var%Flux(is,iseg) = Var%Flux(is,iseg) + norm*Flux12(is)
+             wc1(is) = Ua(is,is2)
+             wc2(is) = Data%Fr(inum)%Ua(is)
+          END DO
+
+          CALL GodunovTypeFlux(Iflux,nx,ny,Wc1,Wc2,Flux12)
+          DO is = 1, 4
+          !   Var%Flux(is,is2) = Var%Flux(is,is2) + norm*Flux12(is)
+             Var%Flux(is,iseg) = Var%Flux(is,iseg) + norm*Flux12(is) 
+          END DO
+
+
+       case(6) ! mur !
+          
+
+       CASE DEFAULT
+          WRITE(6,*) " La condition aux limites  ", ilog,& 
+               & " n est pas traitee"
+          STOP
+
+       END SELECT
+
+    END DO
+
+    print*,'dans fluxcellvertex_bord'
+    do is=1,Mesh%NsegmtFr
+       print*,'Var%Flux(:,:)',Var%Flux(:,is)
+    enddo
+    stop
+
+  END SUBROUTINE FluxCellVertex_bord
+!*******************************************************************!
+
+
+!*******************************************************************!
+  SUBROUTINE GodunovTypeFlux (Iflux,nx,ny,Ua1, Ua2, Flux)
+    
+    INTEGER,                 INTENT(in)    :: Iflux
+    REAL(PR),                INTENT(in)    :: nx, ny
+    REAL(PR), DIMENSION(4),  INTENT(in)    :: Ua1, Ua2
+    REAL(PR), DIMENSION(4),  INTENT(out)   :: Flux
+    
+    ! calcul du flux avec UL = Ua1 et Ur = Ua2 !
+    SELECT CASE (Iflux)
+
+    CASE(2)
+       CALL fluxhll (nx,ny,Ua1,Ua2,Flux)
+
+    CASE DEFAULT 
+       PRINT*,'Flux non code '
+       STOP
+    END SELECT
+
+  END SUBROUTINE GodunovTypeFlux
+!***************************************************************************!
+
+
+!***************************************************************************!
+  SUBROUTINE fluxhll(nx,ny,Ua1,Ua2,Flux)
+    
+    REAL(PR) ,               INTENT(in) :: nx , ny
+    REAL(PR), DIMENSION(4),  INTENT(in) :: Ua1, Ua2
+    REAL(PR), DIMENSION(4),  INTENT(out):: Flux
+    
+    REAL(PR)                      :: scal
+    REAL(PR), DIMENSION(1:2,1:2)  :: D_edd1, D_edd2
+   
+    scal = 0.5_PR * c_lum**2
+    D_edd1 = Tenseur_Eddington(Ua1)
+    D_edd2 = Tenseur_Eddington(Ua2)
+
+    Flux(1:4) = 0._PR
+      
+    Flux(1) = 0.5_PR * ( (Ua1(2) + Ua2(2) )*nx + (Ua1(3)+Ua2(3) )*ny &
+                       - c_lum*(Ua2(1) - Ua1(1) ) )
+
+    Flux(2) = scal * ( (D_edd1(1,1)*Ua1(1)+D_edd2(1,1)*Ua2(1) )*nx &
+                     + (D_edd1(1,2)*Ua1(1)+D_edd2(1,2)*Ua2(1) )*ny ) &
+            - 0.5_PR*c_lum*(Ua2(2) - Ua1(2) )
+
+    Flux(3) = scal * ( (D_edd1(2,1)*Ua1(1)+D_edd2(2,1)*Ua2(1) )*nx &
+                     + (D_edd1(2,2)*Ua1(1)+D_edd2(2,2)*Ua2(1) )*ny ) &
+            - 0.5_PR*c_lum*(Ua2(3) - Ua1(3) )
+
+    Flux(4) = - 0.5_PR*c_lum*(Ua2(4) - Ua1(4) )
+
+  END SUBROUTINE fluxhll
+!**********************************************************************!
+
+
+END MODULE Numerique

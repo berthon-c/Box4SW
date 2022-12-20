@@ -150,16 +150,16 @@ CONTAINS
              CALL Calcul_Flux_numerique (DATA%Iflux, nx, ny, Ua1, Ua2, Flux)
 
              CALL TermeSource (Data%Isource_topo, Data%Isource_friction, Data%Isource_pluie, &
-                  &     nx,  ny, Ua1, Ua2, Z1, Z2, dx1, Source12)
+                  &     nx,  ny, Ua1, Ua2, Z1, Z2, dx1, Source12, Mesh%coor(1:2,is1), Mesh%coor(1:2,is2))
             
               CALL TermeSource (Data%Isource_topo, Data%Isource_friction, Data%Isource_pluie, &
-                  &     nx,  ny, Ua1, Ua1, Z1, Z1, dx1, Source11)
+                  &     nx,  ny, Ua1, Ua1, Z1, Z1, dx1, Source11, Mesh%coor(1:2,is1), Mesh%coor(1:2,is1))
 
              CALL TermeSource (Data%Isource_topo, Data%Isource_friction, Data%Isource_pluie, &
-                  &    -nx, -ny, Ua1, Ua2, Z2, Z1, dx2, Source21)
+                  &    -nx, -ny, Ua1, Ua2, Z2, Z1, dx2, Source21, Mesh%coor(1:2,is2), Mesh%coor(1:2,is1))
 
              CALL TermeSource (Data%Isource_topo, Data%Isource_friction, Data%Isource_pluie, &
-                  &    -nx, -ny, Ua2, Ua2, Z2, Z2, dx2, Source22)
+                  &    -nx, -ny, Ua2, Ua2, Z2, Z2, dx2, Source22, Mesh%coor(1:2,is2), Mesh%coor(1:2,is2))
 
              !----------------------------------------------------!
              !      SCHEMA NUMERIQUE (interieur du domaine)       !
@@ -182,10 +182,10 @@ CONTAINS
              CALL Calcul_Flux_numerique (DATA%Iflux, nx, ny, Ua1, Ua2, Flux)
 
              CALL TermeSource (Data%Isource_topo, Data%Isource_friction, Data%Isource_pluie, &
-                  &     nx,  ny, Ua1, Ua2, Z1, Z2, dx1, Source12)
+                  &     nx,  ny, Ua1, Ua2, Z1, Z2, dx1, Source12, Mesh%coor(1:2,is1), Mesh%coor(1:2,is2))
              
              CALL TermeSource (Data%Isource_topo, Data%Isource_friction, Data%Isource_pluie, &
-                  &     nx,  ny, Ua1, Ua1, Z1, Z1, dx1, Source11)
+                  &     nx,  ny, Ua1, Ua1, Z1, Z1, dx1, Source11, Mesh%coor(1:2,is1), Mesh%coor(1:2,is1))
 
              !----------------------------------------------------!
              !         SCHEMA NUMERIQUE (bord du domaine)         !
